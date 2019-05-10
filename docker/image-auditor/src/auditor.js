@@ -1,4 +1,6 @@
-const dgram = require(dgram);
+const dgram = require('dgram');
+const moment = require('moment');
+const net = require('net');
 
 const TCP_PORT = 2205;
 const PROTOCOL_MULTI_ADDRESS = "239.255.22.5";
@@ -30,21 +32,36 @@ function addMusicianToList(msg){
         note : received.Note,
         time : received.timestamp
     }
-        /*
-        * If you add twice the same key in a map, it will update the value of this key.
-        * Therefore you don't need to check wheter a key is already in the map or not
-        */
-        musicians.set(receivedInf.uuid, receivedInf);
-    }
+        if(musicians.has(receivedInf.uuid)){
+            musicians.get(receivedInf.uuid).time = received.timestamp;
+        } else{
+            musicians.set(receivedInf.uuid, receivedInf);
+            musicians.get(receivedInf.uuid).firstReceived = received.timestamp;
+        }
 }
 
+
 function removeMusicianFromList(){
-    musicians.forEach((item, key, musicians)) => {
+    musicians.forEach((item, key, musicians) => {
         var diff = moment().diff(moment(item.time), "seconds");
         if(diff > 5){
             musicians.delete(key);
         }
-    })
+    });
 }
 
+const server = net.createServer((socket) => {
+    var message = [];
+    musicians.forEach((item, key, musicians) =>{
+        message.push({
+            uuid : musicians.get(key).uuid,
+            instrument : sound.get(musicians.get(key).note),
+            activeSince : moment(musicians.get(key).firstReceived).format()
+        });
+    });
+    socket.write(JSON.stringify(message));
+    socket.end();
+})
+
+server.listen(TCP_PORT);
 setInterval(removeMusicianFromList, 1000);
